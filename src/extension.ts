@@ -1,10 +1,13 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
+import * as os from 'os';
+import * as path from 'path';
+import * as fs from 'fs';
 
 let tempDocumentOpenCount = 0;
 let tempDocumentUris: Set<string> = new Set();
-let tempDocumentContents: Map<string, string> = new Map();
+let tempFilePaths: Map<string, string> = new Map(); // URI -> file path mapping
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -15,7 +18,7 @@ export function activate(context: vscode.ExtensionContext) {
 	console.log('Claude Editor Input extension is now active!');
 
 	// Register the main command
-	const sendToClaudeTerminalDisposable = vscode.commands.registerCommand('claude-editor-input.sendToClaudeTerminal', async () => {
+	const openClaudeInputEditorDisposable = vscode.commands.registerCommand('claude-editor-input.openClaudeInputEditor', async () => {
 		try {
 			await createTemporaryEditor();
 		} catch (error) {
@@ -23,78 +26,106 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	});
 
-	// Monitor when documents are closed
-	const onDidCloseDisposable = vscode.workspace.onDidCloseTextDocument(async (document) => {
-		console.debug(`Document closed: ${document.uri.toString()}`);
-		if (isTemporaryDocument(document)) {
+	// Monitor when visible text editors change to detect closed temporary editors
+	const onDidChangeVisibleEditorsDisposable = vscode.window.onDidChangeVisibleTextEditors(async (editors) => {
+		// Get currently visible temporary document URIs
+		const visibleTempUris = new Set<string>();
+		for (const editor of editors) {
+			if (isTemporaryDocument(editor.document)) {
+				visibleTempUris.add(editor.document.uri.toString());
+			}
+		}
+
+		// Find temporary documents that are no longer visible (closed)
+		const closedTempUris: string[] = [];
+		for (const tempUri of tempDocumentUris) {
+			if (!visibleTempUris.has(tempUri)) {
+				closedTempUris.push(tempUri);
+			}
+		}
+
+		// Handle closed temporary documents
+		for (const closedUri of closedTempUris) {
 			try {
-				await handleDocumentClose(document);
+				await handleDocumentCloseByUri(closedUri);
 			} catch (error) {
 				vscode.window.showErrorMessage(`Error processing document: ${error instanceof Error ? error.message : String(error)}`);
 			}
 		}
 	});
 
-	// Monitor when documents change to cache content
-	const onDidChangeDisposable = vscode.workspace.onDidChangeTextDocument((event) => {
-		const document = event.document;
-		if (isTemporaryDocument(document)) {
-			const text = document.getText();
-			// Do not cache if empty characters
-			if (text.trim() !== '') {
-					tempDocumentContents.set(document.uri.toString(), text);
-			}
-		}
-	});
-
-	context.subscriptions.push(sendToClaudeTerminalDisposable, onDidCloseDisposable, onDidChangeDisposable);
+	context.subscriptions.push(openClaudeInputEditorDisposable, onDidChangeVisibleEditorsDisposable);
 }
 
 /**
  * Create and display a temporary Markdown editor
  */
 async function createTemporaryEditor(): Promise<void> {
-	// Create untitled document with Markdown language
-	const document = await vscode.workspace.openTextDocument({
-		language: 'markdown',
-		content: ''
-	});
+	// Generate unique temporary file name
+	const timestamp = Date.now();
+	const fileName = `claude-input-${timestamp}.md`;
+	const tmpFilePath = path.join(os.tmpdir(), fileName);
 
-	// Track this document as temporary
-	tempDocumentUris.add(document.uri.toString());
-	tempDocumentOpenCount++;
+	// Create temporary file
+	fs.writeFileSync(tmpFilePath, '', 'utf8');
+
+	// Open the temporary file
+	const document = await vscode.workspace.openTextDocument(tmpFilePath);
 
 	// Show the document in editor
 	await vscode.window.showTextDocument(document, {
 		preview: false,
 		preserveFocus: false
 	});
+
+	// Track this document as temporary (after showing to avoid timing issues)
+	tempDocumentUris.add(document.uri.toString());
+	tempFilePaths.set(document.uri.toString(), tmpFilePath);
+	tempDocumentOpenCount++;
 }
 
 /**
  * Check if a document is one of our temporary documents
  */
 function isTemporaryDocument(document: vscode.TextDocument): boolean {
-	return document.isUntitled &&
-		   document.languageId === 'markdown' &&
-		   tempDocumentUris.has(document.uri.toString());
+	return tempDocumentUris.has(document.uri.toString());
 }
 
 /**
- * Handle when a temporary document is closed
+ * Handle when a temporary document is closed by URI
  */
-async function handleDocumentClose(document: vscode.TextDocument): Promise<void> {
-	const uriString = document.uri.toString();
+async function handleDocumentCloseByUri(uriString: string): Promise<void> {
 	console.debug(`Handling document close for: ${uriString}`);
 
 	// Remove from tracking
 	tempDocumentUris.delete(uriString);
 
-	// Get document content from cache
-	const content = tempDocumentContents.get(uriString)?.trim() || '';
+	// Get temporary file path
+	const tmpFilePath = tempFilePaths.get(uriString);
+	tempFilePaths.delete(uriString);
 
-	// Remove from content cache
-	tempDocumentContents.delete(uriString);
+	if (!tmpFilePath) {
+		console.debug(`No temporary file path found for: ${uriString}`);
+		return;
+	}
+
+	// Read content from temporary file if it still exists
+	let content = '';
+	if (fs.existsSync(tmpFilePath)) {
+		try {
+			content = fs.readFileSync(tmpFilePath, 'utf8').trim();
+		} catch (error) {
+			console.error(`Failed to read temporary file: ${tmpFilePath}`, error);
+		}
+
+		// Delete the temporary file
+		try {
+			fs.unlinkSync(tmpFilePath);
+			console.debug(`Deleted temporary file: ${tmpFilePath}`);
+		} catch (error) {
+			console.error(`Failed to delete temporary file: ${tmpFilePath}`, error);
+		}
+	}
 
 	if (!content) {
 		vscode.window.showInformationMessage('Document was empty, nothing to send.');
@@ -125,6 +156,14 @@ async function handleDocumentClose(document: vscode.TextDocument): Promise<void>
 }
 
 /**
+ * Handle when a temporary document is closed
+ */
+async function handleDocumentClose(document: vscode.TextDocument): Promise<void> {
+	const uriString = document.uri.toString();
+	await handleDocumentCloseByUri(uriString);
+}
+
+/**
  * Find Claude extension terminal
  */
 function findClaudeTerminal(): vscode.Terminal | undefined {
@@ -135,8 +174,6 @@ function findClaudeTerminal(): vscode.Terminal | undefined {
 	const claudePatterns = [
 		/claude/i,
 		/anthropic/i,
-		/mcp/i,
-		/model.*context.*protocol/i
 	];
 
 	for (const terminal of terminals) {
@@ -161,5 +198,5 @@ function findClaudeTerminal(): vscode.Terminal | undefined {
 // This method is called when your extension is deactivated
 export function deactivate() {
 	tempDocumentUris.clear();
-	tempDocumentContents.clear();
+	tempFilePaths.clear();
 }

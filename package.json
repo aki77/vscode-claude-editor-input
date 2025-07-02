@@ -14,8 +14,8 @@
   "contributes": {
     "commands": [
       {
-        "command": "claude-editor-input.sendToClaudeTerminal",
-        "title": "Send to Claude Terminal"
+        "command": "claude-editor-input.openClaudeInputEditor",
+        "title": "Open Claude Input Editor"
       }
     ]
   },
