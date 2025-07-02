@@ -66,17 +66,22 @@ async function createTemporaryEditor(): Promise<void> {
 	const fileName = `claude-input-${timestamp}.md`;
 	const tmpFilePath = path.join(os.tmpdir(), fileName);
 
-	// Create temporary file
-	fs.writeFileSync(tmpFilePath, '', 'utf8');
+	// Create temporary file with placeholder comment
+	const placeholder = `<!--This is a temporary editor for Claude Code. Enter your prompt for Claude here. -->\n`;
+	fs.writeFileSync(tmpFilePath, placeholder, 'utf8');
 
 	// Open the temporary file
 	const document = await vscode.workspace.openTextDocument(tmpFilePath);
 
-	// Show the document in editor
-	await vscode.window.showTextDocument(document, {
+	// Show the document in editor and move cursor to line 2
+	const editor = await vscode.window.showTextDocument(document, {
 		preview: false,
 		preserveFocus: false
 	});
+
+	// Move cursor to line 2, column 1 (0-indexed)
+	const position = new vscode.Position(1, 0);
+	editor.selection = new vscode.Selection(position, position);
 
 	// Track this document as temporary (after showing to avoid timing issues)
 	tempDocumentUris.add(document.uri.toString());
@@ -125,6 +130,11 @@ async function handleDocumentCloseByUri(uriString: string): Promise<void> {
 		} catch (error) {
 			console.error(`Failed to delete temporary file: ${tmpFilePath}`, error);
 		}
+	}
+
+	// Remove all HTML comment blocks (including multiline)
+	if (content) {
+		content = content.replace(/<!--([\s\S]*?)-->/g, '').trim();
 	}
 
 	if (!content) {
