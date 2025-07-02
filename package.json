@@ -21,10 +21,24 @@
     "url": "https://github.com/aki77/vscode-claude-editor-input/issues"
   },
   "contributes": {
+    "views": {
+      "explorer": [
+        {
+          "id": "claude-input",
+          "name": "Claude Input",
+          "type": "webview",
+          "icon": "$(comment-discussion)"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "claude-editor-input.openClaudeChat",
         "title": "Open Claude Chat"
+      },
+      {
+        "command": "claude-editor-input.showClaudeInput",
+        "title": "Show Claude Input"
       }
     ]
   },

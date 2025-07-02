@@ -11,7 +11,7 @@ export function getWebviewContent(webview: vscode.Webview, context: vscode.Exten
         body {
             font-family: var(--vscode-font-family);
             font-size: var(--vscode-font-size);
-            padding: 8px;
+            padding: 4px;
             margin: 0;
             color: var(--vscode-editor-foreground);
             background-color: var(--vscode-editor-background);
@@ -21,17 +21,17 @@ export function getWebviewContent(webview: vscode.Webview, context: vscode.Exten
 
         .input-container {
             display: flex;
-            gap: 8px;
+            gap: 4px;
             align-items: flex-start;
             height: 100%;
         }
 
         #messageInput {
             flex: 1;
-            min-height: 60px;
-            padding: 8px 12px;
+            min-height: 40px;
+            padding: 6px 8px;
             border: 1px solid var(--vscode-input-border);
-            border-radius: 4px;
+            border-radius: 3px;
             background-color: var(--vscode-input-background);
             color: var(--vscode-input-foreground);
             font-family: inherit;
@@ -50,11 +50,11 @@ export function getWebviewContent(webview: vscode.Webview, context: vscode.Exten
         }
 
         #sendButton {
-            padding: 8px 16px;
+            padding: 6px 12px;
             background-color: var(--vscode-button-background);
             color: var(--vscode-button-foreground);
             border: none;
-            border-radius: 4px;
+            border-radius: 3px;
             cursor: pointer;
             font-family: inherit;
             font-size: inherit;
