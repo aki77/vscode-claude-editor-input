@@ -145,24 +145,33 @@ async function handleDocumentCloseByUri(uriString: string): Promise<void> {
 	// Copy content to clipboard
 	await vscode.env.clipboard.writeText(content);
 
-	// Find Claude terminal
-	const claudeTerminal = findClaudeTerminal();
+	   // Find Claude terminal
+	   let claudeTerminal = findClaudeTerminal();
 
-	if (!claudeTerminal) {
-		vscode.window.showErrorMessage('Claude terminal not found. Please ensure the Claude extension is running.');
-		return;
-	}
+	   if (!claudeTerminal) {
+			   // ターミナルがなければ起動コマンドを実行
+			   await vscode.commands.executeCommand('claude-code.runClaude.keyboard');
+			   // 5秒待機
+			   await new Promise(resolve => setTimeout(resolve, 5000));
+			   // 再度ターミナルを探す
+			   claudeTerminal = findClaudeTerminal();
+	   }
 
-	// Activate terminal and paste content
-	claudeTerminal.show();
+	   if (!claudeTerminal) {
+			   vscode.window.showErrorMessage('Claude terminal not found. Please ensure the Claude extension is running.');
+			   return;
+	   }
 
-	// Small delay to ensure terminal is focused
-	await new Promise(resolve => setTimeout(resolve, 100));
+	   // Activate terminal and paste content
+	   claudeTerminal.show();
 
-	// Paste clipboard content to terminal
-	await vscode.commands.executeCommand('workbench.action.terminal.paste');
+	   // Small delay to ensure terminal is focused
+	   await new Promise(resolve => setTimeout(resolve, 100));
 
-	vscode.window.showInformationMessage('Content sent to Claude terminal successfully!');
+	   // Paste clipboard content to terminal
+	   await vscode.commands.executeCommand('workbench.action.terminal.paste');
+
+	   vscode.window.showInformationMessage('Content sent to Claude terminal successfully!');
 }
 
 /**
