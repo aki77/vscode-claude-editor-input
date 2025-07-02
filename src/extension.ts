@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
+import { getOptimalDecreaseCount, clearScreenSizeCache } from './screenSizeDetector';
 
 let tempDocumentOpenCount = 0;
 let tempDocumentUris: Set<string> = new Set();
@@ -138,11 +139,11 @@ async function createTemporaryEditorInSplit(): Promise<void> {
 	// 下側のエディタグループをアクティブにする
 	await vscode.commands.executeCommand('workbench.action.focusBelowGroup');
 
-	await vscode.commands.executeCommand('workbench.action.decreaseViewHeight');
-	await vscode.commands.executeCommand('workbench.action.decreaseViewHeight');
-	await vscode.commands.executeCommand('workbench.action.decreaseViewHeight');
-	await vscode.commands.executeCommand('workbench.action.decreaseViewHeight');
-	await vscode.commands.executeCommand('workbench.action.decreaseViewHeight');
+	// 画面サイズに応じて動的に縮小回数を決定
+	const decreaseCount = await getOptimalDecreaseCount();
+	for (let i = 0; i < decreaseCount; i++) {
+		await vscode.commands.executeCommand('workbench.action.decreaseViewHeight');
+	}
 
 	// Show the document in editor and move cursor to line 2
 	const editor = await vscode.window.showTextDocument(document, {
@@ -198,4 +199,5 @@ function findClaudeTerminal(): vscode.Terminal | undefined {
 export function deactivate() {
 	tempDocumentUris.clear();
 	tempFilePaths.clear();
+	clearScreenSizeCache();
 }
