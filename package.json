@@ -3,6 +3,8 @@
   "displayName": "Claude Code Editor Input",
   "description": "Input text in a temporary Markdown editor and send it directly to Claude Code Extension.",
   "version": "0.1.0",
+  "publisher": "aki77",
+  "license": "MIT",
   "engines": {
     "vscode": "^1.101.0"
   },
