@@ -204,13 +204,6 @@ function findClaudeTerminal(): vscode.Terminal | undefined {
 		}
 	}
 
-	// If no specific Claude terminal found, try to find any active terminal
-	// This is a fallback - user might have renamed the terminal
-	if (terminals.length > 0) {
-		// Return the most recently created terminal (last in array)
-		return terminals[terminals.length - 1];
-	}
-
 	return undefined;
 }
 
