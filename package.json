@@ -25,6 +25,17 @@
       {
         "command": "claude-editor-input.openClaudeInputEditor",
         "title": "Open Claude Input Editor"
+      },
+      {
+        "command": "claude-editor-input.sendToClaudeTerminal",
+        "title": "Send to Claude Terminal"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "claude-editor-input.sendToClaudeTerminal",
+        "key": "enter",
+        "when": "editorTextFocus && resourceFilename =~ /^claude-input-.*\\.md$/ && !suggestWidgetVisible && !renameInputVisible && !inSnippetMode && !quickFixWidgetVisible"
       }
     ]
   },

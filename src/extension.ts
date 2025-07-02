@@ -12,71 +12,142 @@ let tempFilePaths: Map<string, string> = new Map(); // URI -> file path mapping
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
-
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
 	console.log('Claude Editor Input extension is now active!');
 
-	// Register the main command
+	// claudeTerminalが閉じられたときに一時エディタも閉じる
+	const onTerminalCloseDisposable = vscode.window.onDidCloseTerminal(async (closedTerminal) => {
+		// 閉じられたターミナルがclaudeTerminalかどうかチェック
+		const claudePatterns = [
+			/claude/i,
+			/anthropic/i,
+		];
+
+		if (claudePatterns.some(pattern => pattern.test(closedTerminal.name))) {
+			// 一時ファイルのエディタをすべて閉じる
+			const editorsToClose: vscode.TextEditor[] = [];
+
+			vscode.window.visibleTextEditors.forEach(editor => {
+				if (isTemporaryDocument(editor.document)) {
+					editorsToClose.push(editor);
+				}
+			});
+
+			// エディタを順番に閉じる
+			for (const editor of editorsToClose) {
+				// TabGroups APIを使用してタブを直接閉じる
+				const tabs = vscode.window.tabGroups.all.flatMap(group => group.tabs);
+				const tabToClose = tabs.find(tab =>
+					tab.input instanceof vscode.TabInputText &&
+					tab.input.uri.toString() === editor.document.uri.toString()
+				);
+
+				if (tabToClose) {
+					await vscode.window.tabGroups.close(tabToClose, true);
+				}
+			}
+
+			// 一時ファイルの追跡情報をクリア
+			tempDocumentUris.clear();
+			tempFilePaths.clear();
+			tempDocumentOpenCount = 0;
+		}
+	});
+
+	// メインコマンド: 一時エディタを開く
 	const openClaudeInputEditorDisposable = vscode.commands.registerCommand('claude-editor-input.openClaudeInputEditor', async () => {
 		try {
-			await createTemporaryEditor();
+			// 1. claudeTerminalを探す（なければ開く）
+			let claudeTerminal = findClaudeTerminal();
+			if (!claudeTerminal) {
+				await vscode.commands.executeCommand('claude-code.runClaude.keyboard');
+				// 5秒待機
+				await new Promise(resolve => setTimeout(resolve, 5000));
+				claudeTerminal = findClaudeTerminal();
+			}
+
+			if (!claudeTerminal) {
+				vscode.window.showErrorMessage('Claude terminal not found. Please ensure the Claude extension is running.');
+				return;
+			}
+
+			// 2. claudeTerminalを表示
+			claudeTerminal.show();
+
+			// 3. エディタを下に分割
+			await vscode.commands.executeCommand('workbench.action.splitEditorDown');
+
+			// 4. 新規で開いた下のエディタで一時ファイルを開く
+			await createTemporaryEditorInSplit();
 		} catch (error) {
 			vscode.window.showErrorMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
 		}
 	});
 
-	// Monitor when visible text editors change to detect closed temporary editors
-	const onDidChangeVisibleEditorsDisposable = vscode.window.onDidChangeVisibleTextEditors(async (editors) => {
-		// Get currently visible temporary document URIs
-		const visibleTempUris = new Set<string>();
-		for (const editor of editors) {
-			if (isTemporaryDocument(editor.document)) {
-				visibleTempUris.add(editor.document.uri.toString());
-			}
+	// Enterで送信コマンド
+	const sendToClaudeTerminalDisposable = vscode.commands.registerTextEditorCommand('claude-editor-input.sendToClaudeTerminal', async (editor, edit) => {
+		const document = editor.document;
+		if (!isTemporaryDocument(document)) {
+			return;
 		}
 
-		// Find temporary documents that are no longer visible (closed)
-		const closedTempUris: string[] = [];
-		for (const tempUri of tempDocumentUris) {
-			if (!visibleTempUris.has(tempUri)) {
-				closedTempUris.push(tempUri);
-			}
+		// 送信内容を取得
+		let content = document.getText().replace(/<!--([\s\S]*?)-->/g, '').trim();
+
+		if (!content) {
+			vscode.window.showInformationMessage('Document was empty, nothing to send.');
+			return;
 		}
 
-		// Handle closed temporary documents
-		for (const closedUri of closedTempUris) {
-			try {
-				await handleDocumentCloseByUri(closedUri);
-			} catch (error) {
-				vscode.window.showErrorMessage(`Error processing document: ${error instanceof Error ? error.message : String(error)}`);
-			}
+		await editor.edit(editBuilder => {
+			editBuilder.replace(new vscode.Range(0, 0, document.lineCount, 0), '');
+		});
+
+		let claudeTerminal = findClaudeTerminal();
+
+		if (!claudeTerminal) {
+			vscode.window.showErrorMessage('Claude terminal not found. Please ensure the Claude extension is running.');
+			return;
 		}
+
+		claudeTerminal.show();
+		await new Promise(resolve => setTimeout(resolve, 100));
+		// await vscode.commands.executeCommand('workbench.action.terminal.paste');
+		claudeTerminal.sendText(content);
+		claudeTerminal.sendText('');
 	});
 
-	context.subscriptions.push(openClaudeInputEditorDisposable, onDidChangeVisibleEditorsDisposable);
+	context.subscriptions.push(openClaudeInputEditorDisposable, sendToClaudeTerminalDisposable, onTerminalCloseDisposable);
 }
 
 /**
- * Create and display a temporary Markdown editor
+ * Create and display a temporary Markdown editor in the split (下側)エディタ
  */
-async function createTemporaryEditor(): Promise<void> {
+async function createTemporaryEditorInSplit(): Promise<void> {
 	// Generate unique temporary file name
 	const timestamp = Date.now();
 	const fileName = `claude-input-${timestamp}.md`;
 	const tmpFilePath = path.join(os.tmpdir(), fileName);
 
 	// Create temporary file with placeholder comment
-	const placeholder = `<!--This is a temporary editor for Claude Code. Enter your prompt for Claude here. -->\n`;
+	const placeholder = `<!--Enter your prompt for Claude here. -->\n`;
 	fs.writeFileSync(tmpFilePath, placeholder, 'utf8');
 
 	// Open the temporary file
 	const document = await vscode.workspace.openTextDocument(tmpFilePath);
 
+	// 下側のエディタグループをアクティブにする
+	await vscode.commands.executeCommand('workbench.action.focusBelowGroup');
+
+	await vscode.commands.executeCommand('workbench.action.decreaseViewHeight');
+	await vscode.commands.executeCommand('workbench.action.decreaseViewHeight');
+	await vscode.commands.executeCommand('workbench.action.decreaseViewHeight');
+	await vscode.commands.executeCommand('workbench.action.decreaseViewHeight');
+	await vscode.commands.executeCommand('workbench.action.decreaseViewHeight');
+
 	// Show the document in editor and move cursor to line 2
 	const editor = await vscode.window.showTextDocument(document, {
 		preview: false,
-		preserveFocus: false
+		preserveFocus: false,
 	});
 
 	// Move cursor to line 2, column 1 (0-indexed)
@@ -96,91 +167,7 @@ function isTemporaryDocument(document: vscode.TextDocument): boolean {
 	return tempDocumentUris.has(document.uri.toString());
 }
 
-/**
- * Handle when a temporary document is closed by URI
- */
-async function handleDocumentCloseByUri(uriString: string): Promise<void> {
-	console.debug(`Handling document close for: ${uriString}`);
 
-	// Remove from tracking
-	tempDocumentUris.delete(uriString);
-
-	// Get temporary file path
-	const tmpFilePath = tempFilePaths.get(uriString);
-	tempFilePaths.delete(uriString);
-
-	if (!tmpFilePath) {
-		console.debug(`No temporary file path found for: ${uriString}`);
-		return;
-	}
-
-	// Read content from temporary file if it still exists
-	let content = '';
-	if (fs.existsSync(tmpFilePath)) {
-		try {
-			content = fs.readFileSync(tmpFilePath, 'utf8').trim();
-		} catch (error) {
-			console.error(`Failed to read temporary file: ${tmpFilePath}`, error);
-		}
-
-		// Delete the temporary file
-		try {
-			fs.unlinkSync(tmpFilePath);
-			console.debug(`Deleted temporary file: ${tmpFilePath}`);
-		} catch (error) {
-			console.error(`Failed to delete temporary file: ${tmpFilePath}`, error);
-		}
-	}
-
-	// Remove all HTML comment blocks (including multiline)
-	if (content) {
-		content = content.replace(/<!--([\s\S]*?)-->/g, '').trim();
-	}
-
-	if (!content) {
-		vscode.window.showInformationMessage('Document was empty, nothing to send.');
-		return;
-	}
-
-	// Copy content to clipboard
-	await vscode.env.clipboard.writeText(content);
-
-	   // Find Claude terminal
-	   let claudeTerminal = findClaudeTerminal();
-
-	   if (!claudeTerminal) {
-			   // ターミナルがなければ起動コマンドを実行
-			   await vscode.commands.executeCommand('claude-code.runClaude.keyboard');
-			   // 5秒待機
-			   await new Promise(resolve => setTimeout(resolve, 5000));
-			   // 再度ターミナルを探す
-			   claudeTerminal = findClaudeTerminal();
-	   }
-
-	   if (!claudeTerminal) {
-			   vscode.window.showErrorMessage('Claude terminal not found. Please ensure the Claude extension is running.');
-			   return;
-	   }
-
-	   // Activate terminal and paste content
-	   claudeTerminal.show();
-
-	   // Small delay to ensure terminal is focused
-	   await new Promise(resolve => setTimeout(resolve, 100));
-
-	   // Paste clipboard content to terminal
-	   await vscode.commands.executeCommand('workbench.action.terminal.paste');
-
-	   vscode.window.showInformationMessage('Content sent to Claude terminal successfully!');
-}
-
-/**
- * Handle when a temporary document is closed
- */
-async function handleDocumentClose(document: vscode.TextDocument): Promise<void> {
-	const uriString = document.uri.toString();
-	await handleDocumentCloseByUri(uriString);
-}
 
 /**
  * Find Claude extension terminal
