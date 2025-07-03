@@ -85,6 +85,7 @@ export function getWebviewContent(webview: vscode.Webview, context: vscode.Exten
         const messageInput = document.getElementById('messageInput');
 
         let isLoading = false;
+        let isComposing = false;
 
         // Message sending function
         function sendMessage() {
@@ -115,9 +116,18 @@ export function getWebviewContent(webview: vscode.Webview, context: vscode.Exten
             }
         }
 
-        // Event listener
+        // Event listeners for IME composition
+        messageInput.addEventListener('compositionstart', () => {
+            isComposing = true;
+        });
+
+        messageInput.addEventListener('compositionend', () => {
+            isComposing = false;
+        });
+
+        // Event listener for key events
         messageInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
+            if (e.key === 'Enter' && !e.shiftKey && !isComposing) {
                 e.preventDefault();
                 sendMessage();
             }
