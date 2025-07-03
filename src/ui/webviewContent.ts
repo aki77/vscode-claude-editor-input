@@ -75,6 +75,7 @@ export function getWebviewContent(webview: vscode.Webview, context: vscode.Exten
     <div class="input-container">
         <textarea
             id="messageInput"
+            data-vscode-context='{"webviewSection": "editor"}'
             placeholder="Enter your question or request for Claude..."
         ></textarea>
     </div>
