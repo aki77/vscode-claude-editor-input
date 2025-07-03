@@ -128,11 +128,54 @@ export function getWebviewContent(webview: vscode.Webview, context: vscode.Exten
 
         // Event listener for key events
         messageInput.addEventListener('keydown', (e) => {
+            // NOTE: Even if you specify "webviewSection": "editor", it does not work. Manually handle Ctrl+P and Ctrl+F.
+            if (e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
+                if (e.key === 'p') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    moveCursorUp();
+                    return;
+                }
+                if (e.key === 'f') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    moveCursorRight();
+                    return;
+                }
+            }
+
             if (e.key === 'Enter' && !e.shiftKey && !isComposing) {
                 e.preventDefault();
                 sendMessage();
             }
         });
+
+        function moveCursorUp() {
+            const textarea = messageInput;
+            const text = textarea.value;
+            const cursorPos = textarea.selectionStart;
+
+            const beforeCursor = text.substring(0, cursorPos);
+            const currentLineStart = beforeCursor.lastIndexOf('\\n') + 1;
+            const currentColumn = cursorPos - currentLineStart;
+
+            const prevLineEnd = beforeCursor.lastIndexOf('\\n');
+            if (prevLineEnd === -1) return; // If it's the first line
+
+            const prevLineStart = beforeCursor.lastIndexOf('\\n', prevLineEnd - 1) + 1;
+            const prevLineLength = prevLineEnd - prevLineStart;
+
+            const newColumn = Math.min(currentColumn, prevLineLength);
+            const newPos = prevLineStart + newColumn;
+
+            textarea.setSelectionRange(newPos, newPos);
+        }
+
+        function moveCursorRight() {
+            const textarea = messageInput;
+            const newPos = Math.min(textarea.selectionStart + 1, textarea.value.length);
+            textarea.setSelectionRange(newPos, newPos);
+        }
 
         // Receive messages from extension
         window.addEventListener('message', event => {
