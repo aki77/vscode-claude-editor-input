@@ -2,7 +2,7 @@
   "name": "claude-editor-input",
   "displayName": "Claude Chat UI",
   "description": "A chat interface for interacting with Claude directly within VS Code.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "aki77",
   "license": "MIT",
   "engines": {
