@@ -23,7 +23,7 @@ export class ClaudeInputViewProvider implements vscode.WebviewViewProvider {
 
         webviewView.webview.html = getWebviewContent(webviewView.webview, this._extensionContext);
 
-        // WebViewからのメッセージを処理
+        // Handle messages from the WebView
         webviewView.webview.onDidReceiveMessage(
             async (message: WebviewMessage) => {
                 switch (message.command) {
@@ -38,7 +38,7 @@ export class ClaudeInputViewProvider implements vscode.WebviewViewProvider {
     }
 
     /**
-     * ユーザーのクエリを処理してClaudeに送信
+     * Handle user's query and send it to Claude
      */
     private async handleUserQuery(query: string): Promise<void> {
         if (!this._view) {
@@ -46,20 +46,20 @@ export class ClaudeInputViewProvider implements vscode.WebviewViewProvider {
         }
 
         try {
-            // ローディング状態を表示
+            // Show loading state
             this._view.webview.postMessage({
                 command: 'loadingState',
                 loading: true
             });
 
-            // Claudeターミナルを確保（ない場合は作成）
+            // Ensure Claude terminal (create if not exists)
             let claudeTerminal = await this.ensureClaudeTerminal();
 
             if (!claudeTerminal) {
-                // Claudeターミナルが作成できない場合、エラーを表示
+                // If Claude terminal cannot be created, show error
                 this._view.webview.postMessage({
                     command: 'error',
-                    message: 'Claudeターミナルを作成できませんでした。Claude拡張機能が正しくインストールされ、認証されていることを確認してください。'
+                    message: 'Failed to create Claude terminal. Please make sure the Claude extension is properly installed and authenticated.'
                 });
                 this._view.webview.postMessage({
                     command: 'loadingState',
@@ -68,15 +68,21 @@ export class ClaudeInputViewProvider implements vscode.WebviewViewProvider {
                 return;
             }
 
-            // Claudeターミナルを表示
+            // Show Claude terminal
             claudeTerminal.show();
 
-            // 少し待機してからメッセージを送信
+            // Wait a bit before sending the message
             await new Promise(resolve => setTimeout(resolve, 100));
             claudeTerminal.sendText(query);
+            // Wait a bit to ensure the message is sent as a command, not just a newline
+            await new Promise(resolve => setTimeout(resolve, 50));
             claudeTerminal.sendText('');
 
-            // ローディング終了
+            // Return focus to the webview
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            this._view.show();
+
+            // End loading state
             this._view.webview.postMessage({
                 command: 'loadingState',
                 loading: false
@@ -86,7 +92,7 @@ export class ClaudeInputViewProvider implements vscode.WebviewViewProvider {
             console.error('Error handling user query:', error);
             this._view.webview.postMessage({
                 command: 'error',
-                message: `エラーが発生しました: ${error instanceof Error ? error.message : String(error)}`
+                message: `An error occurred: ${error instanceof Error ? error.message : String(error)}`
             });
             this._view.webview.postMessage({
                 command: 'loadingState',
@@ -96,12 +102,12 @@ export class ClaudeInputViewProvider implements vscode.WebviewViewProvider {
     }
 
     /**
-     * Claudeターミナルを検索
+     * Find Claude terminal
      */
     private findClaudeTerminal(): vscode.Terminal | undefined {
         const terminals = vscode.window.terminals;
 
-        // Claude関連のパターンでターミナルを検索
+        // Search for terminals with Claude-related patterns
         const claudePatterns = [
             /claude/i,
             /anthropic/i,
@@ -110,7 +116,7 @@ export class ClaudeInputViewProvider implements vscode.WebviewViewProvider {
         for (const terminal of terminals) {
             const name = terminal.name.toLowerCase();
 
-            // ターミナル名がClaude関連のパターンにマッチするかチェック
+            // Check if terminal name matches Claude-related patterns
             if (claudePatterns.some(pattern => pattern.test(name))) {
                 return terminal;
             }
@@ -120,7 +126,7 @@ export class ClaudeInputViewProvider implements vscode.WebviewViewProvider {
     }
 
     /**
-     * Claudeターミナルがない場合に作成
+     * Create Claude terminal if not exists
      */
     public async ensureClaudeTerminal(): Promise<vscode.Terminal | undefined> {
         let claudeTerminal = this.findClaudeTerminal();
@@ -128,7 +134,7 @@ export class ClaudeInputViewProvider implements vscode.WebviewViewProvider {
         if (!claudeTerminal) {
             try {
                 await vscode.commands.executeCommand('claude-code.runClaude.keyboard');
-                // 5秒待機
+                // Wait 5 seconds
                 await new Promise(resolve => setTimeout(resolve, 5000));
                 claudeTerminal = this.findClaudeTerminal();
             } catch (error) {

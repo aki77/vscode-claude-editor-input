@@ -8,16 +8,16 @@ import { ClaudeInputViewProvider } from './ui/webviewViewProvider';
 export function activate(context: vscode.ExtensionContext) {
 	console.log('Claude Editor Input extension is now active!');
 
-	// WebviewViewProviderを作成・登録
+	// Create and register WebviewViewProvider
 	const claudeInputProvider = new ClaudeInputViewProvider(context);
 	const webviewViewProviderDisposable = vscode.window.registerWebviewViewProvider('claude-input', claudeInputProvider);
 
-	// 新しいコマンド: Claude Inputビューを表示
+	// New command: Show Claude Input view
 	const showClaudeInputDisposable = vscode.commands.registerCommand('claude-editor-input.showClaudeInput', async () => {
 		try {
-			// Claudeターミナルを確保
+			// Ensure Claude terminal
 			await claudeInputProvider.ensureClaudeTerminal();
-			// エクスプローラーを表示してからビューにフォーカスを移動
+			// Show Explorer and then move focus to the view
 			await vscode.commands.executeCommand('workbench.view.explorer');
 			await vscode.commands.executeCommand('claude-input.focus');
 		} catch (error) {
@@ -25,9 +25,9 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	});
 
-	// 旧コマンド: 互換性のため残すが、新しい実装を使用
+	// Old command: Kept for compatibility, but uses new implementation
 	const openClaudeChatDisposable = vscode.commands.registerCommand('claude-editor-input.openClaudeChat', async () => {
-		// 新しいコマンドを実行
+		// Execute new command
 		await vscode.commands.executeCommand('claude-editor-input.showClaudeInput');
 	});
 
@@ -40,5 +40,5 @@ export function activate(context: vscode.ExtensionContext) {
 
 // This method is called when your extension is deactivated
 export function deactivate() {
-	// WebviewViewは自動的に管理されるため、特別なクリーンアップは不要
+	// No special cleanup needed as WebviewView is managed automatically
 }

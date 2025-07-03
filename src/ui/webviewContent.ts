@@ -20,15 +20,13 @@ export function getWebviewContent(webview: vscode.Webview, context: vscode.Exten
         }
 
         .input-container {
-            display: flex;
-            gap: 4px;
-            align-items: flex-start;
             height: 100%;
         }
 
         #messageInput {
-            flex: 1;
+            width: 100%;
             min-height: 40px;
+            height: 100%;
             padding: 6px 8px;
             border: 1px solid var(--vscode-input-border);
             border-radius: 3px;
@@ -36,7 +34,7 @@ export function getWebviewContent(webview: vscode.Webview, context: vscode.Exten
             color: var(--vscode-input-foreground);
             font-family: inherit;
             font-size: inherit;
-            resize: vertical;
+            resize: none;
             box-sizing: border-box;
         }
 
@@ -45,33 +43,16 @@ export function getWebviewContent(webview: vscode.Webview, context: vscode.Exten
             border-color: var(--vscode-focusBorder);
         }
 
-        #messageInput::placeholder {
-            color: var(--vscode-input-placeholderForeground);
-        }
-
-        #sendButton {
-            padding: 6px 12px;
-            background-color: var(--vscode-button-background);
-            color: var(--vscode-button-foreground);
-            border: none;
-            border-radius: 3px;
-            cursor: pointer;
-            font-family: inherit;
-            font-size: inherit;
-            transition: background-color 0.2s;
-            white-space: nowrap;
-        }
-
-        #sendButton:hover:not(:disabled) {
-            background-color: var(--vscode-button-hoverBackground);
-        }
-
-        #sendButton:disabled {
+        #messageInput:disabled {
             opacity: 0.6;
             cursor: not-allowed;
         }
 
-        /* スクロールバーのスタイル */
+        #messageInput::placeholder {
+            color: var(--vscode-input-placeholderForeground);
+        }
+
+        /* Scrollbar style */
         #messageInput::-webkit-scrollbar {
             width: 8px;
         }
@@ -94,47 +75,47 @@ export function getWebviewContent(webview: vscode.Webview, context: vscode.Exten
     <div class="input-container">
         <textarea
             id="messageInput"
-            placeholder="Claudeに質問やリクエストを入力してください..."
+            placeholder="Enter your question or request for Claude..."
         ></textarea>
-        <button id="sendButton">送信</button>
     </div>
 
     <script>
         const vscode = acquireVsCodeApi();
 
         const messageInput = document.getElementById('messageInput');
-        const sendButton = document.getElementById('sendButton');
 
         let isLoading = false;
 
-        // メッセージ送信機能
+        // Message sending function
         function sendMessage() {
             const text = messageInput.value.trim();
             if (!text || isLoading) return;
 
-            // 入力欄をクリア
+            // Clear input field
             messageInput.value = '';
 
-            // ローディング状態に設定
+            // Set loading state
             setLoading(true);
 
-            // 拡張機能にメッセージを送信
+            // Send message to extension
             vscode.postMessage({
                 command: 'userQuery',
                 text: text
             });
         }
 
-        // ローディング状態の管理
+        // Manage loading state
         function setLoading(loading) {
             isLoading = loading;
-            sendButton.disabled = loading;
-            sendButton.textContent = loading ? '送信中...' : '送信';
+            messageInput.disabled = loading;
+
+            // Keep focus
+            if (!loading) {
+                setTimeout(() => messageInput.focus(), 10);
+            }
         }
 
-        // イベントリスナー
-        sendButton.addEventListener('click', sendMessage);
-
+        // Event listener
         messageInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -142,7 +123,7 @@ export function getWebviewContent(webview: vscode.Webview, context: vscode.Exten
             }
         });
 
-        // 拡張機能からのメッセージを受信
+        // Receive messages from extension
         window.addEventListener('message', event => {
             const message = event.data;
 
@@ -158,7 +139,7 @@ export function getWebviewContent(webview: vscode.Webview, context: vscode.Exten
             }
         });
 
-        // 初期フォーカス
+        // Initial focus
         messageInput.focus();
     </script>
 </body>
