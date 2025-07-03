@@ -73,10 +73,18 @@ export class ClaudeInputViewProvider implements vscode.WebviewViewProvider {
 
             // Wait a bit before sending the message
             await new Promise(resolve => setTimeout(resolve, 100));
-            claudeTerminal.sendText(query);
-            // Wait a bit to ensure the message is sent as a command, not just a newline
-            await new Promise(resolve => setTimeout(resolve, 50));
-            claudeTerminal.sendText('');
+
+            // NOTE: If the input is a single character, do not send the Enter key because it will be sent only with the selection key.
+            if (query.length > 1) {
+                claudeTerminal.sendText(query);
+                // Wait a bit to ensure the message is sent as a command, not just a newline
+                await new Promise(resolve => setTimeout(resolve, 50));
+                claudeTerminal.sendText('');
+            } else {
+                await vscode.commands.executeCommand('workbench.action.terminal.sendSequence', {
+                    text: query
+                });
+            }
 
             // Return focus to the webview
             await new Promise(resolve => setTimeout(resolve, 1000));
