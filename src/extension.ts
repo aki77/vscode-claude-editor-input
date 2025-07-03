@@ -25,16 +25,10 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	});
 
-	// Old command: Kept for compatibility, but uses new implementation
-	const openClaudeChatDisposable = vscode.commands.registerCommand('claude-editor-input.openClaudeChat', async () => {
-		// Execute new command
-		await vscode.commands.executeCommand('claude-editor-input.showClaudeInput');
-	});
 
 	context.subscriptions.push(
 		webviewViewProviderDisposable,
 		showClaudeInputDisposable,
-		openClaudeChatDisposable
 	);
 }
 

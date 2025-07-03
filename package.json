@@ -33,10 +33,6 @@
     },
     "commands": [
       {
-        "command": "claude-editor-input.openClaudeChat",
-        "title": "Open Claude Chat"
-      },
-      {
         "command": "claude-editor-input.showClaudeInput",
         "title": "Show Claude Input"
       }
