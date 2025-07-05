@@ -60,6 +60,7 @@
     "check-types": "tsc --noEmit",
     "lint": "biome check src",
     "format": "biome format --write src",
+    "publish": "pnpm vsce publish --no-dependencies",
     "test": "vscode-test"
   },
   "devDependencies": {
