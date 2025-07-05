@@ -148,15 +148,7 @@ async function handleDocumentCloseByUri(uriString: string): Promise<void> {
     content = content.replace(/<!--([\s\S]*?)-->/g, "").trim();
   }
 
-  if (!content) {
-    vscode.window.showInformationMessage(
-      "Document was empty, nothing to send.",
-    );
-    return;
-  }
-
-  // Copy content to clipboard
-  await vscode.env.clipboard.writeText(content);
+  if (!content) return;
 
   // Find Claude terminal
   let claudeTerminal = findClaudeTerminal();
@@ -177,18 +169,8 @@ async function handleDocumentCloseByUri(uriString: string): Promise<void> {
     return;
   }
 
-  // Activate terminal and paste content
   claudeTerminal.show();
-
-  // Small delay to ensure terminal is focused
-  await new Promise((resolve) => setTimeout(resolve, 100));
-
-  // Paste clipboard content to terminal
-  await vscode.commands.executeCommand("workbench.action.terminal.paste");
-
-  vscode.window.showInformationMessage(
-    "Content sent to Claude terminal successfully!",
-  );
+  claudeTerminal.sendText(content, false);
 }
 
 /**
