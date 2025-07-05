@@ -1,7 +1,7 @@
 {
   "name": "claude-editor-input",
-  "displayName": "Claude Chat UI",
-  "description": "A chat interface for interacting with Claude directly within VS Code.",
+  "displayName": "Claude Code Editor Input",
+  "description": "Input text in a temporary Markdown editor and send it directly to Claude Code Extension.",
   "version": "0.5.0",
   "publisher": "aki77",
   "license": "MIT",
@@ -21,22 +21,31 @@
     "url": "https://github.com/aki77/vscode-claude-editor-input/issues"
   },
   "contributes": {
-    "views": {
-      "explorer": [
-        {
-          "id": "claude-input",
-          "name": "Claude Input",
-          "type": "webview",
-          "icon": "$(comment-discussion)"
-        }
-      ]
-    },
     "commands": [
       {
-        "command": "claude-editor-input.showClaudeInput",
-        "title": "Show Claude Input"
+        "command": "claude-editor-input.openClaudeInputEditor",
+        "title": "Open Claude Input Editor",
+        "icon": "$(note)",
+        "when": "claude-code.hasClaudeInPath"
       }
-    ]
+    ],
+    "keybindings": [
+      {
+        "command": "claude-editor-input.openClaudeInputEditor",
+        "key": "ctrl+alt+i",
+        "mac": "ctrl+alt+i",
+        "when": "terminalFocus && claude-code.hasClaudeInPath"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "claude-editor-input.openClaudeInputEditor",
+          "group": "navigation",
+          "when": "claude-code.hasClaudeInPath"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "pnpm run package",
@@ -50,8 +59,7 @@
     "pretest": "pnpm run compile-tests && pnpm run compile && pnpm run lint",
     "check-types": "tsc --noEmit",
     "lint": "eslint src",
-    "test": "vscode-test",
-    "publish": "pnpm vsce publish --no-dependencies"
+    "test": "vscode-test"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
