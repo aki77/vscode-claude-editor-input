@@ -9,6 +9,10 @@ import * as vscode from "vscode";
 let _tempDocumentOpenCount = 0;
 const tempDocumentUris: Set<string> = new Set();
 const tempFilePaths: Map<string, string> = new Map(); // URI -> file path mapping
+const originalEditorInfo: Map<
+  string,
+  { document: vscode.TextDocument; selection: vscode.Selection }
+> = new Map(); // URI -> original editor info
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -72,6 +76,18 @@ export function activate(context: vscode.ExtensionContext) {
  * Create and display a temporary Markdown editor
  */
 async function createTemporaryEditor(): Promise<void> {
+  // Save current active editor info before creating temporary editor
+  const activeEditor = vscode.window.activeTextEditor;
+  let originalInfo:
+    | { document: vscode.TextDocument; selection: vscode.Selection }
+    | undefined;
+  if (activeEditor) {
+    originalInfo = {
+      document: activeEditor.document,
+      selection: activeEditor.selection,
+    };
+  }
+
   // Generate unique temporary file name
   const timestamp = Date.now();
   const fileName = `claude-input-${timestamp}.md`;
@@ -97,6 +113,12 @@ async function createTemporaryEditor(): Promise<void> {
   // Track this document as temporary (after showing to avoid timing issues)
   tempDocumentUris.add(document.uri.toString());
   tempFilePaths.set(document.uri.toString(), tmpFilePath);
+
+  // Save original editor info if available
+  if (originalInfo) {
+    originalEditorInfo.set(document.uri.toString(), originalInfo);
+  }
+
   _tempDocumentOpenCount++;
 }
 
@@ -150,6 +172,24 @@ async function handleDocumentCloseByUri(uriString: string): Promise<void> {
 
   if (!content) return;
 
+  // Restore original editor and selection if available
+  const originalInfo = originalEditorInfo.get(uriString);
+  if (originalInfo) {
+    try {
+      const editor = await vscode.window.showTextDocument(
+        originalInfo.document,
+        {
+          preview: false,
+          preserveFocus: false,
+        },
+      );
+      editor.selection = originalInfo.selection;
+    } catch (error) {
+      console.error(`Failed to restore original editor: ${error}`);
+    }
+    originalEditorInfo.delete(uriString);
+  }
+
   // Find Claude terminal
   let claudeTerminal = findClaudeTerminal();
 
@@ -171,16 +211,6 @@ async function handleDocumentCloseByUri(uriString: string): Promise<void> {
 
   claudeTerminal.show();
   claudeTerminal.sendText(content, false);
-}
-
-/**
- * Handle when a temporary document is closed
- */
-async function _handleDocumentClose(
-  document: vscode.TextDocument,
-): Promise<void> {
-  const uriString = document.uri.toString();
-  await handleDocumentCloseByUri(uriString);
 }
 
 /**
@@ -209,4 +239,5 @@ function findClaudeTerminal(): vscode.Terminal | undefined {
 export function deactivate() {
   tempDocumentUris.clear();
   tempFilePaths.clear();
+  originalEditorInfo.clear();
 }
