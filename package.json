@@ -2,7 +2,7 @@
   "name": "claude-editor-input",
   "displayName": "Claude Code Editor Input",
   "description": "Input text in a temporary Markdown editor and send it directly to Claude Code Extension.",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "publisher": "aki77",
   "license": "MIT",
   "engines": {
