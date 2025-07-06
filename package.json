@@ -34,7 +34,7 @@
         "command": "claude-editor-input.openClaudeInputEditor",
         "key": "ctrl+alt+i",
         "mac": "ctrl+alt+i",
-        "when": "terminalFocus && claude-code.hasClaudeInPath"
+        "when": "claude-code.hasClaudeInPath"
       }
     ],
     "menus": {
