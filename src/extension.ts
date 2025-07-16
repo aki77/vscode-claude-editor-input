@@ -112,7 +112,6 @@ async function createTemporaryEditor(): Promise<void> {
   _tempDocumentOpenCount++;
 }
 
-
 /**
  * Handle when a temporary document is closed by URI
  */
