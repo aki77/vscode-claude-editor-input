@@ -35,40 +35,30 @@ export function activate(context: vscode.ExtensionContext) {
     },
   );
 
-  // Monitor when visible text editors change to detect closed temporary editors
-  const onDidChangeVisibleEditorsDisposable =
-    vscode.window.onDidChangeVisibleTextEditors(async (editors) => {
-      // Get currently visible temporary document URIs
-      const visibleTempUris = new Set<string>();
-      for (const editor of editors) {
-        if (isTemporaryDocument(editor.document)) {
-          visibleTempUris.add(editor.document.uri.toString());
+  // Monitor when tabs are closed to detect closed temporary editors
+  const onDidChangeTabsDisposable = vscode.window.tabGroups.onDidChangeTabs(
+    async (event) => {
+      // Handle closed tabs
+      for (const closedTab of event.closed) {
+        if (closedTab.input instanceof vscode.TabInputText) {
+          const uriString = closedTab.input.uri.toString();
+          if (tempDocumentUris.has(uriString)) {
+            try {
+              await handleDocumentCloseByUri(uriString);
+            } catch (error) {
+              vscode.window.showErrorMessage(
+                `Error processing document: ${error instanceof Error ? error.message : String(error)}`,
+              );
+            }
+          }
         }
       }
-
-      // Find temporary documents that are no longer visible (closed)
-      const closedTempUris: string[] = [];
-      for (const tempUri of tempDocumentUris) {
-        if (!visibleTempUris.has(tempUri)) {
-          closedTempUris.push(tempUri);
-        }
-      }
-
-      // Handle closed temporary documents
-      for (const closedUri of closedTempUris) {
-        try {
-          await handleDocumentCloseByUri(closedUri);
-        } catch (error) {
-          vscode.window.showErrorMessage(
-            `Error processing document: ${error instanceof Error ? error.message : String(error)}`,
-          );
-        }
-      }
-    });
+    },
+  );
 
   context.subscriptions.push(
     openClaudeInputEditorDisposable,
-    onDidChangeVisibleEditorsDisposable,
+    onDidChangeTabsDisposable,
   );
 }
 
@@ -120,13 +110,6 @@ async function createTemporaryEditor(): Promise<void> {
   }
 
   _tempDocumentOpenCount++;
-}
-
-/**
- * Check if a document is one of our temporary documents
- */
-function isTemporaryDocument(document: vscode.TextDocument): boolean {
-  return tempDocumentUris.has(document.uri.toString());
 }
 
 /**
