@@ -25,24 +25,21 @@
       {
         "command": "claude-editor-input.openClaudeInputEditor",
         "title": "Open Claude Input Editor",
-        "icon": "$(note)",
-        "when": "claude-code.hasClaudeInPath"
+        "icon": "$(note)"
       }
     ],
     "keybindings": [
       {
         "command": "claude-editor-input.openClaudeInputEditor",
         "key": "ctrl+alt+i",
-        "mac": "ctrl+alt+i",
-        "when": "claude-code.hasClaudeInPath"
+        "mac": "ctrl+alt+i"
       }
     ],
     "menus": {
       "editor/title": [
         {
           "command": "claude-editor-input.openClaudeInputEditor",
-          "group": "navigation",
-          "when": "claude-code.hasClaudeInPath"
+          "group": "navigation"
         }
       ]
     }
